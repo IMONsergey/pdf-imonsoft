@@ -69,6 +69,7 @@ test('compression controls, result and comparison are accessible on mobile and b
   test.setTimeout(120000);
   for (const theme of ['light', 'dark']) {
     await page.goto('/#/tools/compress-pdf');
+    await page.reload(); // A same-hash navigation intentionally preserves the workspace; reset only the test fixture.
     if (await page.locator('html').getAttribute('data-theme') !== theme) {
       await page.getByRole('button', { name: theme === 'light' ? 'Включить светлую тему' : 'Включить тёмную тему' }).click();
     }
