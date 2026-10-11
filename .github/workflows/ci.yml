@@ -2,7 +2,7 @@ name: Platform checks
 on:
   pull_request:
   push:
-    branches: [main, feat/platform-foundation]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -44,5 +44,7 @@ jobs:
         if: failure()
         with:
           name: browser-report
-          path: apps/web/playwright-report/
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
           retention-days: 7

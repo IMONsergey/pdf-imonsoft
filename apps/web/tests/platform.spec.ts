@@ -16,7 +16,7 @@ test('catalog, search, theme persistence and unknown route', async ({ page }) =>
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.goto('/#/not-a-route');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Страница');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Такой страницы нет');
 });
 
 test('responsive navigation and no horizontal page overflow', async ({ page }) => {
@@ -37,7 +37,9 @@ test('real PDF preview, conversion, download and history', async ({ page }) => {
   page.on('pageerror', error => failures.push(error.message));
   await page.goto('/#/tools/pdf-to-pptx');
   await expect(page.getByText('Слайды в виде изображений', { exact: true })).toBeVisible();
+  const workerResponse = page.waitForResponse(response => response.url().includes('pdf.worker.min'));
   await page.getByTestId('file-input').setInputFiles(path.join(fixtures, 'sample.pdf'));
+  expect((await workerResponse).headers()['content-type']).toContain('javascript');
   await expect(page.getByRole('button', { name: 'Следующая страница' })).toBeVisible();
   await page.getByRole('button', { name: 'Следующая страница' }).click();
   await expect(page.locator('canvas')).toHaveAttribute('aria-label', 'Страница 2');

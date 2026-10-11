@@ -284,7 +284,7 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
             for i, page in enumerate(writer.pages):
                 page.compress_content_streams()
                 progress(round(85 * (i + 1) / count), f'Оптимизация страницы {i + 1} из {count}')
-            writer.compress_identical_objects(remove_identicals=True, remove_orphans=True)
+            writer.compress_identical_objects(remove_duplicates=True, remove_unreferenced=True)
         elif tool == 'protect-pdf':
             if len(options.new_password) < 8:
                 raise ConversionError('Задайте новый пароль длиной не менее 8 символов.')
