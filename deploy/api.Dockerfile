@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app \
     && mkdir /data && chown 10001:10001 /data
 WORKDIR /app
-COPY services/api/requirements.txt /app/requirements.txt
-RUN pip install --requirement /app/requirements.txt
+COPY services/api/requirements.lock /app/requirements.lock
+RUN pip install --require-hashes --requirement /app/requirements.lock
 COPY services/api/app /app/app
 COPY shared /app/shared
 ENV DATA_DIR=/data TOOLS_FILE=/app/shared/tools.json

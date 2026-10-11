@@ -27,10 +27,13 @@ def default_tools_file() -> Path:
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.getenv("DATA_DIR", ".data")).resolve())
     max_upload_mb: int = field(default_factory=lambda: env_int("MAX_UPLOAD_MB", 50, 1, 500))
-    max_files: int = 20
+    max_files: int = field(default_factory=lambda: env_int("MAX_FILES", 20, 1, 100))
     max_pages: int = field(default_factory=lambda: env_int("MAX_PAGES", 200, 1, 1000))
-    max_output_mb: int = 250
+    max_output_mb: int = field(default_factory=lambda: env_int("MAX_OUTPUT_MB", 250, 1, 500))
     max_jobs: int = 24
+    max_storage_mb: int = field(default_factory=lambda: env_int("MAX_STORAGE_MB", 4096, 512, 131072))
+    session_storage_mb: int = field(default_factory=lambda: env_int("SESSION_STORAGE_MB", 1024, 256, 32768))
+    access_password_hash: str = field(default_factory=lambda: os.getenv("ACCESS_PASSWORD_HASH", ""), repr=False)
     session_jobs: int = 3
     job_timeout: int = field(default_factory=lambda: env_int("JOB_TIMEOUT_SECONDS", 180, 15, 1800))
     worker_memory_mb: int = field(default_factory=lambda: env_int("WORKER_MEMORY_MB", 1536, 256, 8192))

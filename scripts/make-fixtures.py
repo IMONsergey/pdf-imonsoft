@@ -28,3 +28,15 @@ im = Image.new('RGB', (1200, 800), '#204fff')
 ImageDraw.Draw(im).rectangle((150, 150, 1050, 650), fill='white')
 im.save(root / 'sample.png')
 print(root)
+
+# Password and pagination fixtures are synthetic and contain no user credentials.
+from pypdf import PdfReader, PdfWriter
+writer = PdfWriter(clone_from=root / 'sample.pdf')
+writer.encrypt('fixture-password-123', algorithm='AES-256')
+writer.write(root / 'protected.pdf')
+writer.close()
+writer = PdfWriter()
+for index in range(27):
+    writer.add_page(PdfReader(root / 'sample.pdf').pages[index % 3])
+writer.write(root / 'many-pages.pdf')
+writer.close()

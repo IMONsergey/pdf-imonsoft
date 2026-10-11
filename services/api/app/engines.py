@@ -12,7 +12,7 @@ from typing import Callable
 
 import httpx
 from PIL import Image, ImageOps, UnidentifiedImageError
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter, Transformation
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
@@ -164,7 +164,9 @@ def office_to_pdf(path: Path, outdir: Path, settings: Settings, progress: Progre
                             target.write(chunk)
         except httpx.HTTPError:
             raise ConversionError('Office-движок недоступен или время обработки истекло. Проверьте Gotenberg.') from None
-    if not output.is_file() or not output.read_bytes()[:5] == b'%PDF-':
+    with output.open('rb') if output.is_file() else io.BytesIO() as check:
+        valid_pdf = check.read(5) == b'%PDF-'
+    if not valid_pdf:
         raise ConversionError('Office-движок не вернул корректный PDF.')
     reader_for(output, ConvertOptions(), settings)
     return output
@@ -211,6 +213,14 @@ def process_images(tool: str, inputs: list[Path], outdir: Path, options: Convert
         document.save()
         return output
     with image_open(inputs[0]) as image:
+        if tool == 'image-rotate':
+            image = image.rotate(-options.angle, expand=True)
+        elif tool == 'image-flip':
+            image = ImageOps.mirror(image) if options.flip == 'horizontal' else ImageOps.flip(image)
+        elif tool == 'image-grayscale':
+            alpha = image.convert('RGBA').getchannel('A')
+            image = ImageOps.grayscale(image).convert('RGBA')
+            image.putalpha(alpha)
         if tool == 'image-resize':
             image.thumbnail((options.width, options.height), Image.Resampling.LANCZOS)
         output = outdir / f'result.{options.format}'
@@ -240,8 +250,19 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
     progress(5, 'Проверяем документ')
     if tool in ('pptx-to-pdf', 'docx-to-pdf', 'excel-to-pdf'):
         return office_to_pdf(inputs[0], outdir, settings, progress), ['Верстка может отличаться, если исходные шрифты отсутствуют на сервере.']
-    if tool in ('images-to-pdf', 'image-convert', 'image-compress', 'image-resize'):
+    if tool in ('images-to-pdf', 'image-convert', 'image-compress', 'image-resize', 'image-rotate', 'image-flip', 'image-grayscale'):
+        for path in inputs:
+            try:
+                with Image.open(path) as check:
+                    if getattr(check, 'n_frames', 1) > 1:
+                        warnings.append('Многостраничное изображение: обработан только первый кадр.')
+            except (OSError, UnidentifiedImageError):
+                raise ConversionError('Не удалось открыть изображение.') from None
         return process_images(tool, inputs, outdir, options, progress), warnings
+
+    from .extra_engines import EXTRA_TOOLS, convert_extra
+    if tool in EXTRA_TOOLS:
+        return convert_extra(tool, inputs[0], outdir, options, settings, progress)
 
     source = reader_for(inputs[0], options, settings)
     count = len(source.pages)
@@ -259,11 +280,14 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
             progress(round(85 * (i + 1) / len(inputs)), f'Документ {i + 1} из {len(inputs)}')
     elif tool == 'split-pdf':
         parts = []
-        for i, page in enumerate(source.pages):
+        for i in range(0, len(indexes), options.split_every):
             part = PdfWriter()
-            part.add_page(page)
-            parts.append(write_pdf(part, outdir / f'page-{i+1:03d}.pdf'))
-            progress(round(85 * (i + 1) / count), f'Страница {i + 1} из {count}')
+            selected = indexes[i:i + options.split_every]
+            for index in selected:
+                part.add_page(source.pages[index])
+            label = f'page-{selected[0]+1:03d}' if len(selected) == 1 else f'part-{i // options.split_every+1:03d}'
+            parts.append(write_pdf(part, outdir / f'{label}.pdf'))
+            progress(round(85 * min(i + options.split_every, len(indexes)) / len(indexes)), 'Разделяем страницы')
         return make_zip(parts, outdir / 'pages.zip'), warnings
     elif tool in ('extract-pages', 'remove-pages'):
         selected = parse_pages(options.pages, count, allow_empty=False)
@@ -309,9 +333,14 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
         from reportlab.pdfbase.pdfmetrics import stringWidth
         for i, source_page in enumerate(source.pages):
             page = writer.add_page(source_page)
+            if i not in indexes:
+                continue
             page.transfer_rotation_to_content()
-            width, height = float(page.mediabox.width), float(page.mediabox.height)
+            box = page.cropbox
+            width, height = float(box.width), float(box.height)
             overlay_bytes = io.BytesIO()
+            if not (math.isfinite(width) and math.isfinite(height) and width > 0 and height > 0):
+                raise ConversionError('Некорректный размер страницы.')
             overlay = canvas.Canvas(overlay_bytes, pagesize=(width, height))
             if tool == 'watermark-pdf':
                 fontsize = min(48, width / 12)
@@ -320,8 +349,8 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
                     fontsize *= width * 0.85 / actual
                 overlay.saveState()
                 overlay.translate(width / 2, height / 2)
-                overlay.rotate(30)
-                overlay.setFillAlpha(0.22)
+                overlay.rotate(options.watermark_angle)
+                overlay.setFillAlpha(options.watermark_opacity)
                 overlay.setFillColorRGB(0.25, 0.27, 0.32)
                 overlay.setFont(font, fontsize)
                 overlay.drawCentredString(0, 0, options.text)
@@ -329,10 +358,11 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
             else:
                 overlay.setFont(font, 10)
                 overlay.setFillColorRGB(0.25, 0.27, 0.32)
-                overlay.drawCentredString(width / 2, min(18, height / 10), str(options.start + i))
+                overlay.drawCentredString(width / 2, min(18, height / 10), str(options.start + indexes.index(i)))
             overlay.save()
             overlay_bytes.seek(0)
-            page.merge_page(PdfReader(overlay_bytes).pages[0])
+            page.merge_transformed_page(PdfReader(overlay_bytes).pages[0],
+                Transformation().translate(float(box.left), float(box.bottom)))
             progress(round(85 * (i + 1) / count), f'Страница {i + 1} из {count}')
     elif tool == 'pdf-to-text':
         texts = []
@@ -357,7 +387,7 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
         from pptx import Presentation
         from pptx.util import Inches
         deck = Presentation()
-        for i, (image, (page_width, page_height)) in enumerate(render_pages(inputs[0], list(range(count)), options.dpi, options.password, progress)):
+        for i, (image, (page_width, page_height)) in enumerate(render_pages(inputs[0], indexes, options.dpi, options.password, progress)):
             if i == 0:
                 # PowerPoint has a single page size for the entire deck, max 56 inches.
                 factor = min(1, 50 * 72 / max(page_width, page_height))
@@ -384,13 +414,13 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
         if not executable:
             raise ConversionError('На сервере не установлен Tesseract.')
         parts = []
-        for i, (image, _) in enumerate(render_pages(inputs[0], list(range(count)), 144, options.password, progress)):
+        for i, (image, _) in enumerate(render_pages(inputs[0], indexes, options.dpi, options.password, progress)):
             raster = outdir / f'ocr-{i:03d}.png'
-            image.save(raster, dpi=(144, 144))
+            image.save(raster, dpi=(options.dpi, options.dpi))
             image.close()
             base = outdir / f'ocr-{i:03d}'
             try:
-                process = subprocess.run([executable, str(raster), str(base), '-l', options.language, '--dpi', '144', 'pdf'], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45, check=False)
+                process = subprocess.run([executable, str(raster), str(base), '-l', options.language, '--dpi', str(options.dpi), 'pdf'], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45, check=False)
             except subprocess.TimeoutExpired:
                 raise ConversionError('Распознавание страницы превысило лимит времени.') from None
             raster.unlink(missing_ok=True)

@@ -14,7 +14,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, Depends, HTTPException, Request
+from starlette.datastructures import UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
 from starlette.middleware.sessions import SessionMiddleware
@@ -23,7 +24,12 @@ from starlette.formparsers import MultiPartException
 from .catalog import load_catalog
 from .config import Settings
 from .jobs import JobManager, JobStore, QueueFull
-from .models import ConvertOptions
+from .models import ConvertOptions, ConversionError
+from .pipeline import validate_options
+from .access import AccessControl, WindowLimit
+
+
+MAX_OPTIONS_SIZE = 65536
 
 
 class BodyTooLarge(MultiPartException):
@@ -76,7 +82,10 @@ class BodyLimitMiddleware:
 
 def display_name(raw: str | None) -> str:
     name = (raw or 'file').replace('\\', '/').split('/')[-1]
-    name = re.sub(r'[\x00-\x1f\x7f]', '', name).strip().strip('.')[:160]
+    name = re.sub(r'[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]', '', name).strip().strip('.')
+    if len(name) > 160:
+        suffix = Path(name).suffix[:24]
+        name = name[:160 - len(suffix)] + suffix
     return name or 'file'
 
 
@@ -87,6 +96,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     store = JobStore(settings)
     manager = JobManager(store, settings)
     engine_cache: dict = {'at': 0.0, 'value': {}}
+    access = AccessControl(settings)
+    uploads = asyncio.Semaphore(2)
+    creates = WindowLimit(60, 60)
+    global_creates = WindowLimit(120, 60)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -94,8 +107,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         await manager.stop()
 
-    app = FastAPI(title='IMONSOFT Files API', version='0.1.0', lifespan=lifespan, docs_url=None, openapi_url='/api/openapi.json', redoc_url=None)
+    app = FastAPI(title='IMONSOFT Files API', version='0.2.0', dependencies=[Depends(access.require)], lifespan=lifespan, docs_url=None, openapi_url=None, redoc_url=None)
     app.state.store, app.state.manager, app.state.settings = store, manager, settings
+    access.register(app)
     app.add_middleware(SessionMiddleware, secret_key=settings.session_secret(), session_cookie='imonsoft_session', same_site='strict', https_only=settings.secure_cookie, max_age=7 * 86400)
     app.add_middleware(BodyLimitMiddleware, limit=settings.max_upload_bytes + 1024 * 1024)
 
@@ -105,8 +119,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if request.headers.get('x-imonsoft-client') != 'web':
                 return JSONResponse({'detail': 'Отсутствует заголовок безопасности запроса.'}, 403)
             origin = request.headers.get('origin')
-            if origin and urlsplit(origin).netloc != request.headers.get('host'):
-                return JSONResponse({'detail': 'Запрос с другого сайта запрещён.'}, 403)
+            if origin:
+                try:
+                    parsed_origin = urlsplit(origin)
+                    valid_origin = (parsed_origin.scheme in ('http', 'https')
+                        and parsed_origin.netloc == request.headers.get('host')
+                        and not parsed_origin.username and not parsed_origin.password
+                        and parsed_origin.path in ('', '/')
+                        and not parsed_origin.query and not parsed_origin.fragment)
+                except ValueError:
+                    valid_origin = False
+                if not valid_origin:
+                    return JSONResponse({'detail': 'Запрос с другого сайта запрещён.'}, 403)
         response = await call_next(request)
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Cache-Control'] = 'no-store'
@@ -150,16 +174,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         engine_cache.update(at=time.monotonic(), value=value)
         return value
 
+    @app.get('/api/openapi.json', include_in_schema=False)
+    async def schema():
+        return app.openapi()
+
     @app.get('/api/health')
     async def health():
-        return {'status': 'ok', 'version': '0.1.0'}
+        alive = manager.loop_task is not None and not manager.loop_task.done()
+        return JSONResponse({'status': 'ok' if alive else 'degraded', 'version': '0.2.0', 'queueAlive': alive}, status_code=200 if alive else 503)
 
     @app.get('/api/v1/config')
     async def config(request: Request):
         session_id(request)
         availability = await engines()
         return {
-            'version': '0.1.0', 'maxUploadMb': settings.max_upload_mb, 'maxFiles': settings.max_files,
+            'version': '0.2.0', 'accessEnabled': access.enabled, 'sessionStorageMb': settings.session_storage_mb, 'maxUploadMb': settings.max_upload_mb, 'maxFiles': settings.max_files,
             'maxPages': settings.max_pages, 'retentionSeconds': settings.retention_seconds,
             'engines': availability,
             'tools': [{'id': tool['id'], 'available': bool(availability[tool['engine']])} for tool in catalog.values()],
@@ -169,69 +198,156 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def list_jobs(request: Request):
         return {'jobs': [store.public(job) for job in store.list(session_id(request))]}
 
-    @app.post('/api/v1/jobs', status_code=202)
-    async def create_job(request: Request, tool: str = Form(...), options: str = Form('{}'), files: list[UploadFile] = File(...)):
-        definition = catalog.get(tool)
+    def admit(request: Request):
+        sid = session_id(request)
+        if not creates.take(sid) or not global_creates.take('server'):
+            raise HTTPException(429, 'Слишком много запусков. Подождите минуту.', headers={'Retry-After': '60'})
+        if uploads.locked():
+            raise HTTPException(429, 'Сервер принимает другие файлы. Повторите через несколько секунд.')
+        if shutil.disk_usage(settings.data_dir).free < (settings.max_upload_mb + settings.max_output_mb * 2) * 1024 * 1024:
+            raise HTTPException(507, 'Недостаточно свободного места для безопасной обработки.')
+        with store.connect() as db:
+            try:
+                store.check_storage(db, sid, 0)
+            except QueueFull as exc:
+                raise HTTPException(429, str(exc)) from None
+        return sid
+
+    async def validate(tool, raw_options):
+        definition = catalog.get(tool) if isinstance(tool, str) else None
         if not definition:
             raise HTTPException(400, 'Неизвестный инструмент.')
+        if not isinstance(raw_options, str) or len(raw_options) > MAX_OPTIONS_SIZE:
+            raise HTTPException(400, 'Некорректный набор параметров.')
+        try:
+            parsed = ConvertOptions.model_validate_json(raw_options)
+            validate_options(definition, parsed)
+            allowed = set(definition['settings']) | {'batch', 'postprocess'}
+            if parsed.postprocess == 'watermark':
+                allowed |= {'text', 'watermark_opacity', 'watermark_angle'}
+            if parsed.postprocess == 'number':
+                allowed.add('start')
+            if parsed.model_fields_set - allowed:
+                raise ConversionError('Параметры не соответствуют выбранному инструменту.')
+        except (ValidationError, ConversionError) as exc:
+            raise HTTPException(422, str(exc) if isinstance(exc, ConversionError) else 'Неверные параметры обработки.') from None
         availability = await engines()
         if not availability[definition['engine']]:
             raise HTTPException(503, 'Нужный движок сейчас недоступен. Проверьте его подключение.')
-        if len(options) > 16384:
-            raise HTTPException(400, 'Слишком большой набор параметров.')
-        try:
-            parsed = ConvertOptions.model_validate_json(options)
-        except ValidationError:
-            raise HTTPException(422, 'Неверные параметры обработки.') from None
-        if tool == 'protect-pdf' and len(parsed.new_password) < 8:
-            raise HTTPException(422, 'Новый пароль должен содержать не менее 8 символов.')
-        if tool in ('extract-pages', 'remove-pages') and not parsed.pages.strip():
-            raise HTTPException(422, 'Укажите номера страниц.')
-        if tool == 'watermark-pdf' and not parsed.text.strip():
-            raise HTTPException(422, 'Введите текст водяного знака.')
         if tool == 'ocr-pdf' and not all(lang in availability['ocrLanguages'] for lang in parsed.language.split('+')):
             raise HTTPException(422, 'Выбранный язык OCR не установлен на сервере.')
-        if not definition['minFiles'] <= len(files) <= settings.max_files or (not definition['multiple'] and len(files) != 1):
-            raise HTTPException(422, f"Для этого инструмента нужно файлов: {definition['minFiles']}–{settings.max_files if definition['multiple'] else 1}.")
-        job_id = secrets.token_hex(16)
+        return definition, parsed
+
+    def persist(job_id, sid, tool, names, inputs, parsed, total_size):
         root = store.root / job_id
-        input_dir = root / 'input'
-        input_dir.mkdir(parents=True, mode=0o700)
-        total_size, names, inputs = 0, [], []
+        manifest = root / 'manifest.json'
+        manifest.write_text(json.dumps({'tool': tool, 'inputs': inputs, 'names': names, 'options': parsed.model_dump()}, ensure_ascii=False))
+        os.chmod(manifest, 0o600)
         try:
-            for index, upload in enumerate(files):
-                name = display_name(upload.filename)
-                suffix = Path(name).suffix.lower()
-                if suffix not in definition['accept']:
-                    raise HTTPException(415, f"Неподдерживаемый формат. Допустимы: {', '.join(definition['accept'])}.")
-                path = input_dir / f'{index:03d}{suffix}'
-                size = 0
-                with path.open('wb') as stream:
-                    while chunk := await upload.read(1024 * 1024):
-                        total_size += len(chunk)
-                        size += len(chunk)
-                        if total_size > settings.max_upload_bytes:
-                            raise HTTPException(413, f'Суммарный размер файлов превышает {settings.max_upload_mb} МБ.')
-                        stream.write(chunk)
-                if size == 0:
-                    raise HTTPException(422, 'Пустой файл обработать нельзя.')
-                os.chmod(path, 0o600)
-                names.append(name)
-                inputs.append(str(path.relative_to(root)))
-            manifest = root / 'manifest.json'
-            manifest.write_text(json.dumps({'tool': tool, 'inputs': inputs, 'options': parsed.model_dump()}, ensure_ascii=False))
-            os.chmod(manifest, 0o600)
-            job = store.create(job_id, session_id(request), tool, names, total_size)
+            return store.public(store.create(job_id, sid, tool, names, total_size))
         except QueueFull as exc:
-            shutil.rmtree(root, ignore_errors=True)
             raise HTTPException(429, str(exc)) from None
-        except BaseException:
-            shutil.rmtree(root, ignore_errors=True)
-            raise
-        finally:
-            for upload in files:
-                await upload.close()
-        return store.public(job)
+
+    @app.post('/api/v1/jobs', status_code=202)
+    async def create_job(request: Request):
+        sid = admit(request)
+        if not request.headers.get('content-type', '').lower().startswith('multipart/form-data;'):
+            raise HTTPException(415, 'Для загрузки файлов требуется multipart/form-data.')
+        async with uploads:
+            # Bound the number of multipart parts before they are spooled to disk.
+            async with request.form(max_files=settings.max_files, max_fields=2, max_part_size=MAX_OPTIONS_SIZE) as form:
+                if set(form.keys()) - {'tool', 'options', 'files'} or len(form.getlist('tool')) != 1 or len(form.getlist('options')) > 1:
+                    raise HTTPException(422, 'Некорректная структура запроса.')
+                tool = form.get('tool')
+                definition, parsed = await validate(tool, form.get('options', '{}'))
+                files = form.getlist('files')
+                multiple = definition['multiple'] or parsed.batch
+                if not definition['minFiles'] <= len(files) <= settings.max_files or (not multiple and len(files) != 1):
+                    raise HTTPException(422, 'Неверное количество файлов для этой операции.')
+                if any(not isinstance(file, UploadFile) for file in files):
+                    raise HTTPException(422, 'В поле files должны находиться файлы.')
+                job_id = secrets.token_hex(16)
+                root = store.root / job_id
+                input_dir = root / 'input'
+                input_dir.mkdir(parents=True, mode=0o700)
+                total_size, names, inputs = 0, [], []
+                try:
+                    for index, upload in enumerate(files):
+                        name = display_name(upload.filename)
+                        suffix = Path(name).suffix.lower()
+                        if suffix not in definition['accept']:
+                            raise HTTPException(415, f"Неподдерживаемый формат. Допустимы: {', '.join(definition['accept'])}.")
+                        path = input_dir / f'{index:03d}{suffix}'
+                        size = 0
+                        with path.open('wb') as stream:
+                            while chunk := await upload.read(1024 * 1024):
+                                total_size += len(chunk)
+                                size += len(chunk)
+                                if total_size > settings.max_upload_bytes:
+                                    raise HTTPException(413, f'Суммарный размер файлов превышает {settings.max_upload_mb} МБ.')
+                                stream.write(chunk)
+                        if size == 0:
+                            raise HTTPException(422, 'Пустой файл обработать нельзя.')
+                        os.chmod(path, 0o600)
+                        names.append(name)
+                        inputs.append(str(path.relative_to(root)))
+                    return persist(job_id, sid, tool, names, inputs, parsed, total_size)
+                except BaseException:
+                    shutil.rmtree(root, ignore_errors=True)
+                    raise
+
+    @app.post('/api/v1/jobs/{source_id}/continue', status_code=202)
+    async def continue_job(source_id: str, request: Request):
+        source = owned(source_id, request)
+        if source['state'] != 'done' or not source['output_file']:
+            raise HTTPException(409, 'Исходный результат ещё не готов.')
+        sid = admit(request)
+        async with uploads:
+            raw = bytearray()
+            async for chunk in request.stream():
+                raw.extend(chunk)
+                if len(raw) > MAX_OPTIONS_SIZE + 4096:
+                    raise HTTPException(413, 'Слишком большой набор параметров.')
+            try:
+                body = json.loads(raw)
+                if not isinstance(body, dict) or set(body) - {'tool', 'options'}:
+                    raise ValueError
+            except (ValueError, TypeError):
+                raise HTTPException(422, 'Некорректный запрос продолжения.') from None
+            tool = body.get('tool')
+            definition, parsed = await validate(tool, json.dumps(body.get('options', {})))
+            original = store.root / source_id / 'output' / source['output_file']
+            if original.suffix.lower() not in definition['accept'] or definition['minFiles'] != 1 or parsed.batch:
+                raise HTTPException(422, 'Результат несовместим с выбранной операцией.')
+            if not original.is_file() or original.is_symlink():
+                raise HTTPException(404, 'Исходный результат уже удалён.')
+            if original.stat().st_size > settings.max_upload_bytes:
+                raise HTTPException(413, 'Результат превышает лимит входного файла следующей задачи.')
+            job_id = secrets.token_hex(16)
+            root = store.root / job_id
+            target = root / 'input' / ('000' + original.suffix)
+            target.parent.mkdir(parents=True, mode=0o700)
+            try:
+                await asyncio.to_thread(shutil.copyfile, original, target)
+                owned(source_id, request)  # Re-check expiry/ownership after the copy.
+                os.chmod(target, 0o600)
+                name = display_name(Path(json.loads(source['names'])[0]).stem + '-result' + original.suffix)
+                return persist(job_id, sid, tool, [name], [str(target.relative_to(root))], parsed, target.stat().st_size)
+            except FileNotFoundError:
+                shutil.rmtree(root, ignore_errors=True)
+                raise HTTPException(404, 'Исходный результат удалён во время копирования.') from None
+            except BaseException:
+                shutil.rmtree(root, ignore_errors=True)
+                raise
+
+    @app.post('/api/v1/history/clear')
+    async def clear_history(request: Request):
+        count = 0
+        for job in store.list(session_id(request)):
+            if job['state'] in ('done', 'error', 'cancelled'):
+                store.delete(job['id'])
+                count += 1
+        return {'deleted': count}
 
     @app.get('/api/v1/jobs/{job_id}')
     async def get_job(job_id: str, request: Request):

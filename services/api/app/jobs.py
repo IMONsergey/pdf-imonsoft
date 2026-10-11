@@ -38,6 +38,10 @@ class JobStore:
             )''')
             db.execute('CREATE INDEX IF NOT EXISTS jobs_session_created ON jobs(session, created DESC)')
             db.execute('CREATE INDEX IF NOT EXISTS jobs_state_created ON jobs(state, created)')
+        with self.connect() as db:
+            columns = {row[1] for row in db.execute('PRAGMA table_info(jobs)')}
+            if 'batch_result' not in columns:
+                db.execute('ALTER TABLE jobs ADD COLUMN batch_result TEXT')
         os.chmod(self.database, 0o600)
 
     @contextmanager
@@ -58,9 +62,23 @@ class JobStore:
             session_count = db.execute("SELECT COUNT(*) FROM jobs WHERE session=? AND state IN ('queued', 'running')", (session,)).fetchone()[0]
             if global_count >= self.settings.max_jobs or session_count >= self.settings.session_jobs:
                 raise QueueFull('Очередь заполнена. Дождитесь завершения текущих задач.')
+            self.check_storage(db, session, input_size)
             db.execute('INSERT INTO jobs(id,session,tool,names,state,created,expires,input_size) VALUES(?,?,?,?,?,?,?,?)',
                        (job_id, session, tool, json.dumps(names), 'queued', now, now + self.settings.retention_seconds, input_size))
         return self.get(job_id, session)  # type: ignore[return-value]
+
+    def check_storage(self, db, session: str, input_size: int) -> None:
+        # Reserve output space for queued/running jobs, not only the bytes uploaded so far.
+        reserve = self.settings.max_output_mb * 1024 * 1024
+        expression = "CASE WHEN state IN ('queued','running') THEN input_size + ? ELSE COALESCE(output_size,0) END"
+        global_size, global_count = db.execute(f'SELECT COALESCE(SUM({expression}),0),COUNT(*) FROM jobs', (reserve,)).fetchone()
+        session_size, session_count = db.execute(f'SELECT COALESCE(SUM({expression}),0),COUNT(*) FROM jobs WHERE session=?', (reserve, session)).fetchone()
+        if global_count >= 1000 or session_count >= 100:
+            raise QueueFull('Слишком много сохранённых задач. Удалите завершённые результаты.')
+        if global_size + input_size + reserve > self.settings.max_storage_mb * 1024 * 1024:
+            raise QueueFull('Хранилище сервера заполнено. Удалите результаты или дождитесь автоудаления.')
+        if session_size + input_size + reserve > self.settings.session_storage_mb * 1024 * 1024:
+            raise QueueFull('Лимит хранилища сессии исчерпан. Удалите ненужные результаты.')
 
     def get(self, job_id: str, session: str | None = None) -> dict | None:
         with self.connect() as db:
@@ -87,8 +105,8 @@ class JobStore:
     def finish(self, job_id: str, state: str, *, error: str | None = None, result: dict | None = None) -> None:
         result = result or {}
         with self.connect() as db:
-            db.execute("UPDATE jobs SET state=?, error=?, output_file=?, output_size=?, warnings=? WHERE id=? AND state NOT IN ('cancelled')",
-                       (state, error, result.get('file'), result.get('size'), json.dumps(result.get('warnings', []), ensure_ascii=False), job_id))
+            db.execute("UPDATE jobs SET state=?, error=?, output_file=?, output_size=?, warnings=?, batch_result=? WHERE id=? AND state NOT IN ('cancelled')",
+                       (state, error, result.get('file'), result.get('size'), json.dumps(result.get('warnings', []), ensure_ascii=False), json.dumps(result['batch']) if result.get('batch') else None, job_id))
 
     def cancel(self, job_id: str) -> None:
         with self.connect() as db:
@@ -101,14 +119,17 @@ class JobStore:
 
     def recover(self) -> None:
         with self.connect() as db:
-            rows = db.execute("SELECT id FROM jobs WHERE state='running'").fetchall()
+            rows = db.execute("SELECT id,state FROM jobs WHERE state IN ('running','done','error','cancelled')").fetchall()
             db.execute("UPDATE jobs SET state='error',error='Обработка прервана перезапуском сервера. Загрузите файл повторно.' WHERE state='running'")
         for row in rows:
             self.clean_inputs(row['id'])
+            if row['state'] != 'done':
+                shutil.rmtree(self.root / row['id'] / 'output', ignore_errors=True)
 
     def clean_inputs(self, job_id: str) -> None:
         root = self.root / job_id
         shutil.rmtree(root / 'input', ignore_errors=True)
+        shutil.rmtree(root / 'scratch', ignore_errors=True)
         (root / 'manifest.json').unlink(missing_ok=True)
 
     def expired(self) -> list[str]:
@@ -117,8 +138,11 @@ class JobStore:
 
     def public(self, job: dict) -> dict[str, Any]:
         state = job['state']
+        batch = json.loads(job['batch_result']) if job.get('batch_result') else None
         progress: int | None = 100 if state == 'done' else 0
         stage = {'queued': 'В очереди', 'running': 'Подготавливаем обработку', 'done': 'Готово', 'error': 'Ошибка обработки', 'cancelled': 'Отменено'}[state]
+        if state == 'done' and batch and batch['failed']:
+            stage = 'Готово с ошибками'
         if state == 'running':
             try:
                 current = json.loads((self.root / job['id'] / 'progress.json').read_text())
@@ -126,7 +150,7 @@ class JobStore:
             except (OSError, ValueError, KeyError):
                 pass
         return {
-            'id': job['id'], 'tool': job['tool'], 'names': json.loads(job['names']),
+            'batch': batch, 'id': job['id'], 'tool': job['tool'], 'names': json.loads(job['names']),
             'state': state, 'createdAt': job['created'], 'expiresAt': job['expires'],
             'inputSize': job['input_size'], 'outputSize': job['output_size'],
             'progress': progress, 'stage': stage, 'error': job['error'],
@@ -145,6 +169,7 @@ class JobManager:
         self.closed = False
 
     async def start(self) -> None:
+        self.closed = False
         self.store.recover()
         self.loop_task = asyncio.create_task(self.loop())
 
@@ -165,8 +190,11 @@ class JobManager:
                     self.store.delete(job_id)
                 # Orphan staging directories from interrupted uploads contain no DB row.
                 for path in self.store.root.iterdir():
-                    if path.is_dir() and time.time() - path.stat().st_mtime > self.settings.retention_seconds and not self.store.get(path.name):
-                        shutil.rmtree(path, ignore_errors=True)
+                    try:
+                        if path.is_dir() and time.time() - path.stat().st_mtime > self.settings.retention_seconds and not self.store.get(path.name):
+                            shutil.rmtree(path, ignore_errors=True)
+                    except FileNotFoundError:
+                        pass  # Concurrent cancellation/deletion already removed the staging directory.
                 last_cleanup = time.monotonic()
             while len(self.tasks) < self.settings.concurrency:
                 job = self.store.claim()
@@ -214,8 +242,12 @@ class JobManager:
                 'JOB_TIMEOUT_SECONDS': str(self.settings.job_timeout),
                 'WORKER_MEMORY_MB': str(self.settings.worker_memory_mb),
                 'DATA_DIR': str(root),
+                'TOOLS_FILE': str(self.settings.tools_file),
+                'MAX_OUTPUT_MB': str(self.settings.max_output_mb),
+                'TMPDIR': str(root / 'scratch'),
                 'OMP_NUM_THREADS': '1',
             })
+            (root / 'scratch').mkdir(exist_ok=True, mode=0o700)
             process = await asyncio.create_subprocess_exec(
                 sys.executable, '-m', 'app.worker', str(root / 'manifest.json'),
                 cwd=root, env=env, stdin=asyncio.subprocess.DEVNULL,

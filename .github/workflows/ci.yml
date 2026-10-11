@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libreoffice-impress libreoffice-writer libreoffice-calc tesseract-ocr tesseract-ocr-eng fonts-dejavu-core
-          pip install -r services/api/requirements-dev.txt
+          pip install --require-hashes -r services/api/requirements-dev.lock
       - name: Backend tests (including real Office and OCR)
         working-directory: services/api
         run: python -m pytest tests -q

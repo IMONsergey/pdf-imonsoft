@@ -21,21 +21,23 @@ def main() -> int:
         import resource
         memory = int(os.getenv('WORKER_MEMORY_MB', '1536')) * 1024 * 1024
         resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
-        resource.setrlimit(resource.RLIMIT_FSIZE, (250 * 1024 * 1024, 250 * 1024 * 1024))
+        output_limit = int(os.getenv('MAX_OUTPUT_MB', '250')) * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_FSIZE, (output_limit, output_limit))
         resource.setrlimit(resource.RLIMIT_NOFILE, (128, 128))
     from .config import Settings
     from .models import ConversionError, ConvertOptions
-    from .engines import convert
+    from .pipeline import execute
     try:
-        result, warnings = convert(
-            config['tool'], [root / path for path in config['inputs']], root / 'output',
-            ConvertOptions.model_validate(config['options']), Settings(),
+        settings = Settings()
+        result, warnings, batch = execute(
+            config['tool'], [root / path for path in config['inputs']], config.get('names', config['inputs']), root / 'output',
+            ConvertOptions.model_validate(config['options']), settings,
             lambda percent, stage: atomic_json(root / 'progress.json', {'progress': percent, 'stage': stage}),
         )
         size = result.stat().st_size
-        if not 0 < size <= 250 * 1024 * 1024:
+        if not 0 < size <= settings.max_output_mb * 1024 * 1024:
             raise ConversionError('Результат пуст или превышает допустимый размер.')
-        atomic_json(root / 'result.json', {'file': result.name, 'size': size, 'warnings': warnings})
+        atomic_json(root / 'result.json', {'file': result.name, 'size': size, 'warnings': warnings, 'batch': batch})
         return 0
     except ConversionError as exc:
         atomic_json(root / 'error.json', {'message': str(exc)})

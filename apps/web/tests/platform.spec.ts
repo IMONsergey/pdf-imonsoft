@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
+import catalog from '../../../shared/tools.json' with { type: 'json' };
 const fixtures = path.resolve(process.cwd(), '../../.data/fixtures');
 
 test('catalog, search, theme persistence and unknown route', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Файлы');
-  await expect(page.locator('.tool-grid .tool-card')).toHaveCount(23);
+  await expect(page.locator('.tool-grid .tool-card')).toHaveCount(catalog.length);
   await page.getByRole('searchbox').fill('pptx');
   await expect(page.locator('.tool-grid .tool-card')).toHaveCount(2);
   await page.getByRole('searchbox').fill('zzzz-impossible');

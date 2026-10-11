@@ -8,10 +8,12 @@ import { AppProvider } from './lib/context';
 import { byId, categories } from './lib/catalog';
 import { brand } from './lib/brand';
 import { Icon } from './components/Icon';
+import { AccessGate } from './components/AccessGate';
 
-function currentPath() { return window.location.hash.slice(1).split('?')[0].replace(/\/$/, '') || '/'; }
+function currentPath() { return window.location.hash.slice(1).replace(/\/$/, '') || '/'; }
 export default function App() {
-  const [path, setPath] = useState(currentPath);
+  const [route, setPath] = useState(currentPath);
+  const path = route.split('?')[0];
   useEffect(() => { const changed = () => setPath(currentPath()); window.addEventListener('hashchange', changed); return () => window.removeEventListener('hashchange', changed); }, []);
   let title = 'Все инструменты';
   let page;
@@ -21,11 +23,11 @@ export default function App() {
     if (category) { title = category.label; page = <Catalog key={category.id} category={category.id} />; }
   } else if (path.startsWith('/tools/')) {
     const tool = byId(path.split('/')[2]);
-    if (tool) { title = tool.title; page = <Workspace key={tool.id} tool={tool} />; }
+    if (tool) { title = tool.title; page = <Workspace key={route} tool={tool} />; }
   } else if (path === '/history') { title = 'Мои задачи'; page = <History />; }
   else if (/^\/jobs\/[a-f0-9]{32}$/.test(path)) { title = 'Мои задачи'; page = <JobPage key={path} id={path.split('/')[2]} />; }
   else if (path === '/about') { title = 'Как это работает'; page = <About />; }
   if (!page) { title = 'Страница не найдена'; page = <div className="empty-state"><Icon name="files" size={34} /><h1>Такой страницы нет</h1><p>Инструмент мог переехать. Откройте общий каталог.</p><a className="button primary" href="#/">Все инструменты</a></div>; }
   useEffect(() => { document.title = `${title} — ${brand.title}`; }, [title]);
-  return <AppProvider><Layout path={path} title={title}>{page}</Layout></AppProvider>;
+  return <AppProvider><AccessGate><Layout path={path} title={title}>{page}</Layout></AccessGate></AppProvider>;
 }

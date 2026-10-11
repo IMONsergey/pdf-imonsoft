@@ -17,7 +17,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": true,
-    "keywords": "ппт пптх презентация слайды powerpoint"
+    "keywords": "ппт пптх презентация слайды powerpoint",
+    "batch": true,
+    "postprocess": true
   },
   {
     "id": "pdf-to-pptx",
@@ -32,13 +34,16 @@
     "icon": "slides",
     "settings": [
       "dpi",
+      "pages",
       "password"
     ],
     "notice": "Внешний вид сохраняется как изображение. Текст и объекты не редактируются отдельно. Страницы разного размера вписываются в размер первого слайда.",
     "multiple": false,
     "minFiles": 1,
     "featured": true,
-    "keywords": "ппт пптх презентация слайды powerpoint"
+    "keywords": "ппт пптх презентация слайды powerpoint",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "merge-pdf",
@@ -58,12 +63,37 @@
     "multiple": true,
     "minFiles": 2,
     "featured": true,
-    "keywords": "склеить соединить merge"
+    "keywords": "склеить соединить merge",
+    "batch": false,
+    "postprocess": false
+  },
+  {
+    "id": "organize-pdf",
+    "title": "Организовать страницы",
+    "description": "Переставляйте, поворачивайте и удаляйте страницы по миниатюрам.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "pages",
+    "settings": [
+      "page_plan",
+      "password"
+    ],
+    "notice": "Изменения применяются к копии документа.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": false,
+    "postprocess": false
   },
   {
     "id": "split-pdf",
     "title": "Разделить PDF",
-    "description": "Получите отдельный PDF для каждой страницы в ZIP-архиве.",
+    "description": "Разделите документ по страницам или группам заданного размера.",
     "category": "pdf",
     "engine": "pdf",
     "accept": [
@@ -72,13 +102,17 @@
     "output": "ZIP",
     "icon": "split",
     "settings": [
+      "split_every",
+      "pages",
       "password"
     ],
     "notice": "",
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "extract-pages",
@@ -99,7 +133,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": "выбрать переставить сортировка порядок"
+    "keywords": "выбрать переставить сортировка порядок",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "remove-pages",
@@ -120,7 +156,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "rotate-pdf",
@@ -142,7 +180,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "compress-pdf",
@@ -162,7 +202,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": "сжать уменьшить размер"
+    "keywords": "сжать уменьшить размер",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "protect-pdf",
@@ -183,7 +225,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "unlock-pdf",
@@ -203,12 +247,14 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "watermark-pdf",
     "title": "Водяной знак",
-    "description": "Добавьте текстовую отметку на все страницы.",
+    "description": "Добавьте текстовую отметку на все или выбранные страницы.",
     "category": "pdf",
     "engine": "pdf",
     "accept": [
@@ -218,13 +264,18 @@
     "icon": "watermark",
     "settings": [
       "text",
+      "watermark_opacity",
+      "watermark_angle",
+      "pages",
       "password"
     ],
     "notice": "Это визуальная отметка, а не защита от копирования и не электронная подпись.",
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "number-pages",
@@ -239,13 +290,16 @@
     "icon": "numbers",
     "settings": [
       "start",
+      "pages",
       "password"
     ],
     "notice": "",
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "pdf-to-jpg",
@@ -267,7 +321,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "pdf-to-png",
@@ -289,7 +345,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "images-to-pdf",
@@ -315,7 +373,9 @@
     "multiple": true,
     "minFiles": 1,
     "featured": false,
-    "keywords": "jpg jpeg png webp фото"
+    "keywords": "jpg jpeg png webp фото",
+    "batch": false,
+    "postprocess": true
   },
   {
     "id": "pdf-to-text",
@@ -336,7 +396,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": "txt текст копировать"
+    "keywords": "txt текст копировать",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "docx-to-pdf",
@@ -357,7 +419,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": "doc docx ворд документ"
+    "keywords": "doc docx ворд документ",
+    "batch": true,
+    "postprocess": true
   },
   {
     "id": "excel-to-pdf",
@@ -377,7 +441,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": "xls xlsx эксель таблица"
+    "keywords": "xls xlsx эксель таблица",
+    "batch": true,
+    "postprocess": true
   },
   {
     "id": "image-convert",
@@ -404,7 +470,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "image-resize",
@@ -433,7 +501,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "image-compress",
@@ -450,7 +520,7 @@
       ".tiff",
       ".bmp"
     ],
-    "output": "JPG / WebP",
+    "output": "JPG / PNG / WebP",
     "icon": "compress",
     "settings": [
       "format",
@@ -460,7 +530,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "pdf-metadata",
@@ -480,7 +552,9 @@
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": ""
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   },
   {
     "id": "ocr-pdf",
@@ -495,12 +569,247 @@
     "icon": "scan",
     "settings": [
       "language",
+      "dpi",
+      "pages",
       "password"
     ],
-    "notice": "Страницы растрируются с 144 DPI. Распознавание может ошибаться; проверяйте важные числа и имена. Исходные векторные элементы и подписи не сохраняются.",
+    "notice": "Создаётся растровый PDF с текстовым слоем. Распознавание может ошибаться; проверьте числа и имена. Векторные элементы и цифровые подписи не сохраняются.",
     "multiple": false,
     "minFiles": 1,
     "featured": false,
-    "keywords": "ocr распознать русский английский скан"
+    "keywords": "ocr распознать русский английский скан",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "crop-pdf",
+    "title": "Обрезать поля PDF",
+    "description": "Задайте видимую область страниц в процентах от их размера.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "resize",
+    "settings": [
+      "crop_top",
+      "crop_right",
+      "crop_bottom",
+      "crop_left",
+      "pages",
+      "password"
+    ],
+    "notice": "Обрезка скрывает содержимое за полями, но не удаляет его. Это не инструмент удаления конфиденциальных данных.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "pdf-to-docx",
+    "title": "PDF → Word: текст",
+    "description": "Перенесите текстовый слой в редактируемый документ Word.",
+    "category": "documents",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "DOCX",
+    "icon": "text",
+    "settings": [
+      "pages",
+      "password"
+    ],
+    "notice": "Текстовый экспорт: исходная вёрстка, изображения и структура таблиц не восстанавливаются. Для сканов сначала выполните OCR.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "pdf-to-markdown",
+    "title": "PDF → Markdown",
+    "description": "Выгрузите текст документа с разделением по исходным страницам.",
+    "category": "documents",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "MD",
+    "icon": "text",
+    "settings": [
+      "pages",
+      "password"
+    ],
+    "notice": "Извлекается текстовый слой. Заголовки, колонки и таблицы автоматически не реконструируются.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "pdf-extract-images",
+    "title": "Извлечь изображения",
+    "description": "Получите встроенные растровые изображения отдельными файлами.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "ZIP",
+    "icon": "image",
+    "settings": [
+      "pages",
+      "password"
+    ],
+    "notice": "Не экспорт страниц целиком. Векторная графика не является растровым изображением; оформление масок и эффектов может отличаться.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "flatten-pdf",
+    "title": "Растрировать PDF",
+    "description": "Зафиксируйте внешний вид страниц без интерактивных элементов.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "layers",
+    "settings": [
+      "dpi",
+      "pages",
+      "password"
+    ],
+    "notice": "Текст и векторы превращаются в изображения. Поиск, ссылки, формы и цифровые подписи не сохраняются. Для компактности лучше сначала попробовать оптимизацию PDF.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "pdf-info",
+    "title": "Проверить структуру PDF",
+    "description": "Выгрузите количество страниц, размеры, шрифты и метаданные в JSON.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "JSON",
+    "icon": "info",
+    "settings": [
+      "password"
+    ],
+    "notice": "Отчёт может содержать исходные метаданные документа. Это техническая диагностика, не проверка PDF/A или цифровой подписи.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "image-rotate",
+    "title": "Повернуть изображение",
+    "description": "Поворот на 90, 180 или 270 градусов без обрезки.",
+    "category": "images",
+    "engine": "image",
+    "accept": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".tif",
+      ".tiff",
+      ".bmp"
+    ],
+    "output": "JPG / PNG / WebP",
+    "icon": "rotate",
+    "settings": [
+      "angle",
+      "format",
+      "quality"
+    ],
+    "notice": "Для JPG прозрачность заменяется белым фоном. В многостраничном TIFF обрабатывается первый кадр.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "image-flip",
+    "title": "Отразить изображение",
+    "description": "Горизонтальное или вертикальное зеркальное отражение.",
+    "category": "images",
+    "engine": "image",
+    "accept": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".tif",
+      ".tiff",
+      ".bmp"
+    ],
+    "output": "JPG / PNG / WebP",
+    "icon": "resize",
+    "settings": [
+      "flip",
+      "format",
+      "quality"
+    ],
+    "notice": "Для JPG прозрачность заменяется белым фоном. В многостраничном TIFF обрабатывается первый кадр.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
+  },
+  {
+    "id": "image-grayscale",
+    "title": "Изображение в чёрно-белое",
+    "description": "Переведите изображение в оттенки серого.",
+    "category": "images",
+    "engine": "image",
+    "accept": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".tif",
+      ".tiff",
+      ".bmp"
+    ],
+    "output": "JPG / PNG / WebP",
+    "icon": "image",
+    "settings": [
+      "format",
+      "quality"
+    ],
+    "notice": "Для JPG прозрачность заменяется белым фоном. В многостраничном TIFF обрабатывается первый кадр.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "",
+    "batch": true,
+    "postprocess": false
   }
 ]
