@@ -72,3 +72,19 @@ test('merge requires two files and supports order changes', async ({ page }) => 
   await page.getByRole('button', { name: 'Переместить файл 2 выше' }).click();
   await expect(page.getByText('Порядок файлов изменён')).toBeVisible();
 });
+
+
+test('PowerPoint exports to a real PDF through the Office engine', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/#/tools/pptx-to-pdf');
+  await page.locator('input[type=file]').setInputFiles(path.join(fixtures, 'sample.pptx'));
+  await page.getByRole('button', { name: 'Обработать', exact: true }).click();
+  await expect(page.getByRole('link', { name: /Скачать/ })).toBeVisible({ timeout: 60000 });
+  const downloadEvent = page.waitForEvent('download');
+  await page.getByRole('link', { name: /Скачать/ }).click();
+  const download = await downloadEvent;
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+  expect(await download.failure()).toBeNull();
+  expect(errors).toEqual([]);
+});

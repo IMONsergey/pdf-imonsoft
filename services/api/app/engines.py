@@ -307,7 +307,8 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
         if font == 'Helvetica' and any(ord(char) > 127 for char in options.text):
             raise ConversionError('На сервере нет шрифта для кириллицы. Настройте STAMP_FONT_PATH.')
         from reportlab.pdfbase.pdfmetrics import stringWidth
-        for i, page in enumerate(source.pages):
+        for i, source_page in enumerate(source.pages):
+            page = writer.add_page(source_page)
             page.transfer_rotation_to_content()
             width, height = float(page.mediabox.width), float(page.mediabox.height)
             overlay_bytes = io.BytesIO()
@@ -332,7 +333,6 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
             overlay.save()
             overlay_bytes.seek(0)
             page.merge_page(PdfReader(overlay_bytes).pages[0])
-            writer.add_page(page)
             progress(round(85 * (i + 1) / count), f'Страница {i + 1} из {count}')
     elif tool == 'pdf-to-text':
         texts = []

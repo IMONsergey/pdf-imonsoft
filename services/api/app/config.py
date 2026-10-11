@@ -12,6 +12,17 @@ def env_int(name: str, default: int, minimum: int, maximum: int) -> int:
     return value
 
 
+def default_tools_file() -> Path:
+    explicit = os.getenv("TOOLS_FILE")
+    if explicit:
+        return Path(explicit)
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "shared/tools.json"
+        if candidate.is_file():
+            return candidate
+    raise RuntimeError("Set TOOLS_FILE to the shared tools.json catalog.")
+
+
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.getenv("DATA_DIR", ".data")).resolve())
@@ -29,7 +40,7 @@ class Settings:
     office_engine: str = field(default_factory=lambda: os.getenv("OFFICE_ENGINE", "gotenberg"))
     libreoffice_bin: str = field(default_factory=lambda: os.getenv("LIBREOFFICE_BIN", "libreoffice"))
     secure_cookie: bool = field(default_factory=lambda: os.getenv("COOKIE_SECURE", "false").lower() == "true")
-    tools_file: Path = field(default_factory=lambda: Path(os.getenv("TOOLS_FILE", str(Path(__file__).resolve().parents[3] / "shared/tools.json"))))
+    tools_file: Path = field(default_factory=default_tools_file)
 
     @property
     def max_upload_bytes(self) -> int:

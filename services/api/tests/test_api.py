@@ -89,3 +89,15 @@ def test_chunked_body_limit(settings):
         r=c.post('/api/v1/jobs',headers={**HEADERS,'Content-Type':f'multipart/form-data; boundary={boundary}'},content=chunks())
         assert r.status_code==413,r.text
         assert c.get('/api/v1/jobs').json()['jobs']==[]
+
+
+def test_container_catalog_path(tmp_path,monkeypatch):
+    import app.config as configuration
+    packaged=tmp_path/'app'/'shared'/'tools.json'
+    packaged.parent.mkdir(parents=True)
+    packaged.write_text('[]')
+    monkeypatch.delenv('TOOLS_FILE',raising=False)
+    monkeypatch.setattr(configuration,'__file__',str(tmp_path/'app'/'app'/'config.py'))
+    assert configuration.Settings().tools_file==packaged
+    monkeypatch.setenv('TOOLS_FILE',str(packaged))
+    assert configuration.Settings().tools_file==packaged
