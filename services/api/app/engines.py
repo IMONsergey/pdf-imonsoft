@@ -260,6 +260,10 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
                 raise ConversionError('Не удалось открыть изображение.') from None
         return process_images(tool, inputs, outdir, options, progress), warnings
 
+    if tool == 'compress-pdf':
+        from .compression import compress_pdf
+        return compress_pdf(inputs[0], outdir, options, settings, progress)
+
     from .extra_engines import EXTRA_TOOLS, convert_extra
     if tool in EXTRA_TOOLS:
         return convert_extra(tool, inputs[0], outdir, options, settings, progress)
@@ -302,14 +306,9 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
             if i in indexes:
                 page.rotate(options.angle)
             writer.add_page(page)
-    elif tool in ('compress-pdf', 'protect-pdf', 'unlock-pdf', 'pdf-metadata'):
+    elif tool in ('protect-pdf', 'unlock-pdf', 'pdf-metadata'):
         writer.clone_document_from_reader(source)
-        if tool == 'compress-pdf':
-            for i, page in enumerate(writer.pages):
-                page.compress_content_streams()
-                progress(round(85 * (i + 1) / count), f'Оптимизация страницы {i + 1} из {count}')
-            writer.compress_identical_objects(remove_duplicates=True, remove_unreferenced=True)
-        elif tool == 'protect-pdf':
+        if tool == 'protect-pdf':
             if len(options.new_password) < 8:
                 raise ConversionError('Задайте новый пароль длиной не менее 8 символов.')
             import secrets
@@ -436,7 +435,4 @@ def convert(tool: str, inputs: list[Path], outdir: Path, options: ConvertOptions
     else:
         raise ConversionError('Этот инструмент пока не поддерживается.')
     result = write_pdf(writer, output)
-    if tool == 'compress-pdf' and result.stat().st_size >= inputs[0].stat().st_size:
-        shutil.copyfile(inputs[0], result)
-        warnings.append('Документ уже оптимизирован. Сохранён оригинал без увеличения размера.')
     return result, warnings

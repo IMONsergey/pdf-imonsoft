@@ -11,6 +11,7 @@ import { PostProcess } from '../components/PostProcess';
 import { defaultOptions, SettingsFields } from '../components/SettingsFields';
 import { JobStatus } from '../components/JobStatus';
 import { pageRangeError } from '../lib/pages';
+import { CompressionCompare } from '../components/CompressionCompare';
 
 function ImagePreview({ file }: { file: File }) {
   const [url, setUrl] = useState('');
@@ -135,6 +136,7 @@ export function Workspace({ tool }: { tool: Tool }) {
         keys.push('postprocess');
         if (options.postprocess === 'watermark') keys.push('text', 'watermark_opacity', 'watermark_angle');
         if (options.postprocess === 'number') keys.push('start');
+        if (options.postprocess === 'compress') keys.push('compression', 'compression_dpi', 'compression_quality');
       }
       const relevant = Object.fromEntries(keys.map(key => [key, options[key]]));
       if (tool.batch) relevant.batch = options.batch && !source;
@@ -186,12 +188,13 @@ export function Workspace({ tool }: { tool: Tool }) {
         {preview && preview.file.name.toLowerCase().endsWith('.pdf') && (tool.id === 'organize-pdf'
           ? <PageOrganizer key={preview.id} file={preview.file} password={options.password} value={options.page_plan} onChange={plan => setOptions(previous => ({ ...previous, page_plan: plan }))} onCount={setPageCount} disabled={frozen} />
           : <PdfPreview key={preview.id} file={preview.file} password={options.password} onCount={setPageCount} />)}
+        {tool.id === 'compress-pdf' && job?.state === 'done' && !job.batch && preview && <CompressionCompare key={job.id} original={preview.file} password={options.password} job={job} />}
         {preview && /\.(png|jpe?g|webp|bmp)$/i.test(preview.file.name) && <ImagePreview file={preview.file} />}
         {!files.length && !source && <div className="file-privacy"><Icon name="shield" size={18} /><p>Исходный файл не меняется.<br /><span>Отправка на сервер начнётся только после нажатия «Обработать».</span></p></div>}
       </section>
       <aside className="workspace-options">
         <div className="settings-panel"><div className="panel-heading"><h2><span className="step-number">02</span>Параметры</h2><Icon name="sliders" size={18} /></div>
-          {job ? <JobStatus job={job} onCancel={() => { void cancel(); }} onReset={reset} /> : <>
+          {job ? <JobStatus job={job} onCancel={() => { void cancel(); }} onReset={reset} onRetry={tool.id === 'compress-pdf' ? () => { setJob(null); setError(''); setPollError(''); } : undefined} /> : <>
             <fieldset disabled={Boolean(busy)} className="settings-fieldset"><SettingsFields tool={tool} options={options} setOptions={setOptions} />{tool.postprocess && <PostProcess options={options} setOptions={setOptions} />}</fieldset>
             {tool.notice && <div className={`operation-notice ${tool.id === 'pdf-to-pptx' ? 'important' : ''}`}><Icon name="info" size={17} /><div>{tool.id === 'pdf-to-pptx' && <strong>Слайды в виде изображений</strong>}<p>{tool.notice}</p></div></div>}
             <div className="submit-area">

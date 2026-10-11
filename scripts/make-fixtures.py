@@ -40,3 +40,21 @@ for index in range(27):
     writer.add_page(PdfReader(root / 'sample.pdf').pages[index % 3])
 writer.write(root / 'many-pages.pdf')
 writer.close()
+
+# A real multi-megabyte image PDF for end-to-end compression measurements.
+import sys
+import tempfile
+import shutil
+repository = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(repository / 'services/api'), str(repository / 'services/api/tests')]
+from compression_fixtures import image_pdf
+from app.compression import compress_pdf
+from app.config import Settings
+from app.models import ConvertOptions
+image_pdf(root / 'compression-heavy.pdf', jpeg=True, nested=True)
+with tempfile.TemporaryDirectory(prefix='imonsoft-fixture-') as temporary:
+    first = Path(temporary) / 'first'; first.mkdir()
+    second = Path(temporary) / 'second'; second.mkdir()
+    optimized, _ = compress_pdf(root / 'compression-heavy.pdf', first, ConvertOptions(), Settings(), lambda *_: None)
+    stable, _ = compress_pdf(optimized, second, ConvertOptions(), Settings(), lambda *_: None)
+    shutil.copyfile(stable, root / 'compression-optimized.pdf')

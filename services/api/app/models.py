@@ -15,6 +15,9 @@ class ConvertOptions(BaseModel):
     page_plan: list[PageSpec] = Field(default_factory=list, max_length=1000)
     batch: bool = False
     postprocess: Literal["none", "compress", "watermark", "number"] = "none"
+    compression: Literal["lossless", "balanced", "strong", "custom"] = "balanced"
+    compression_dpi: int = Field(default=160, ge=72, le=600)
+    compression_quality: int = Field(default=82, ge=40, le=95)
     split_every: int = Field(default=1, ge=1, le=200)
     crop_top: int = Field(default=5, ge=0, le=45)
     crop_right: int = Field(default=5, ge=0, le=45)

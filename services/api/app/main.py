@@ -107,7 +107,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         await manager.stop()
 
-    app = FastAPI(title='IMONSOFT Files API', version='0.2.0', dependencies=[Depends(access.require)], lifespan=lifespan, docs_url=None, openapi_url=None, redoc_url=None)
+    app = FastAPI(title='IMONSOFT Files API', version='0.3.0', dependencies=[Depends(access.require)], lifespan=lifespan, docs_url=None, openapi_url=None, redoc_url=None)
     app.state.store, app.state.manager, app.state.settings = store, manager, settings
     access.register(app)
     app.add_middleware(SessionMiddleware, secret_key=settings.session_secret(), session_cookie='imonsoft_session', same_site='strict', https_only=settings.secure_cookie, max_age=7 * 86400)
@@ -181,14 +181,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get('/api/health')
     async def health():
         alive = manager.loop_task is not None and not manager.loop_task.done()
-        return JSONResponse({'status': 'ok' if alive else 'degraded', 'version': '0.2.0', 'queueAlive': alive}, status_code=200 if alive else 503)
+        return JSONResponse({'status': 'ok' if alive else 'degraded', 'version': '0.3.0', 'queueAlive': alive}, status_code=200 if alive else 503)
 
     @app.get('/api/v1/config')
     async def config(request: Request):
         session_id(request)
         availability = await engines()
         return {
-            'version': '0.2.0', 'accessEnabled': access.enabled, 'sessionStorageMb': settings.session_storage_mb, 'maxUploadMb': settings.max_upload_mb, 'maxFiles': settings.max_files,
+            'version': '0.3.0', 'accessEnabled': access.enabled, 'sessionStorageMb': settings.session_storage_mb, 'maxUploadMb': settings.max_upload_mb, 'maxFiles': settings.max_files,
             'maxPages': settings.max_pages, 'retentionSeconds': settings.retention_seconds,
             'engines': availability,
             'tools': [{'id': tool['id'], 'available': bool(availability[tool['engine']])} for tool in catalog.values()],
@@ -227,6 +227,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 allowed |= {'text', 'watermark_opacity', 'watermark_angle'}
             if parsed.postprocess == 'number':
                 allowed.add('start')
+            if parsed.postprocess == 'compress':
+                allowed |= {'compression', 'compression_dpi', 'compression_quality'}
             if parsed.model_fields_set - allowed:
                 raise ConversionError('Параметры не соответствуют выбранному инструменту.')
         except (ValidationError, ConversionError) as exc:

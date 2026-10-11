@@ -42,6 +42,8 @@ class JobStore:
             columns = {row[1] for row in db.execute('PRAGMA table_info(jobs)')}
             if 'batch_result' not in columns:
                 db.execute('ALTER TABLE jobs ADD COLUMN batch_result TEXT')
+            if 'details' not in columns:
+                db.execute("ALTER TABLE jobs ADD COLUMN details TEXT NOT NULL DEFAULT '{}'")
         os.chmod(self.database, 0o600)
 
     @contextmanager
@@ -105,8 +107,8 @@ class JobStore:
     def finish(self, job_id: str, state: str, *, error: str | None = None, result: dict | None = None) -> None:
         result = result or {}
         with self.connect() as db:
-            db.execute("UPDATE jobs SET state=?, error=?, output_file=?, output_size=?, warnings=?, batch_result=? WHERE id=? AND state NOT IN ('cancelled')",
-                       (state, error, result.get('file'), result.get('size'), json.dumps(result.get('warnings', []), ensure_ascii=False), json.dumps(result['batch']) if result.get('batch') else None, job_id))
+            db.execute("UPDATE jobs SET state=?, error=?, output_file=?, output_size=?, warnings=?, batch_result=?, details=? WHERE id=? AND state NOT IN ('cancelled')",
+                       (state, error, result.get('file'), result.get('size'), json.dumps(result.get('warnings', []), ensure_ascii=False), json.dumps(result['batch']) if result.get('batch') else None, json.dumps(result.get('details', {}), ensure_ascii=False), job_id))
 
     def cancel(self, job_id: str) -> None:
         with self.connect() as db:
@@ -139,10 +141,13 @@ class JobStore:
     def public(self, job: dict) -> dict[str, Any]:
         state = job['state']
         batch = json.loads(job['batch_result']) if job.get('batch_result') else None
+        details = json.loads(job.get('details') or '{}')
         progress: int | None = 100 if state == 'done' else 0
         stage = {'queued': 'В очереди', 'running': 'Подготавливаем обработку', 'done': 'Готово', 'error': 'Ошибка обработки', 'cancelled': 'Отменено'}[state]
         if state == 'done' and batch and batch['failed']:
             stage = 'Готово с ошибками'
+        if state == 'done' and details.get('compression', {}).get('unchanged'):
+            stage = 'Размер не уменьшился'
         if state == 'running':
             try:
                 current = json.loads((self.root / job['id'] / 'progress.json').read_text())
@@ -150,7 +155,7 @@ class JobStore:
             except (OSError, ValueError, KeyError):
                 pass
         return {
-            'batch': batch, 'id': job['id'], 'tool': job['tool'], 'names': json.loads(job['names']),
+            'details': details, 'batch': batch, 'id': job['id'], 'tool': job['tool'], 'names': json.loads(job['names']),
             'state': state, 'createdAt': job['created'], 'expiresAt': job['expires'],
             'inputSize': job['input_size'], 'outputSize': job['output_size'],
             'progress': progress, 'stage': stage, 'error': job['error'],

@@ -47,7 +47,7 @@ export function Layout({ path, title, children }: { path: string; title: string;
     <aside className="sidebar"><Brand /><Navigation path={path} />
       <div className="sidebar-bottom"><div className="private-space"><Icon name="shield" size={20} /><span>Ваши файлы.<br /><strong>Ваш сервер.</strong></span></div>
         <a href="#/about" className="sidebar-about"><span>Как это работает</span><Icon name="arrow-up-right" size={15} /></a>
-        <div className="sidebar-version"><span>IMONSOFT ECOSYSTEM</span><span>0.2</span></div>
+        <div className="sidebar-version"><span>IMONSOFT ECOSYSTEM</span><span>0.3</span></div>
       </div>
     </aside>
     <div className="app-main">

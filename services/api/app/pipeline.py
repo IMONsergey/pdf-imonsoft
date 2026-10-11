@@ -46,17 +46,24 @@ def execute(tool: str, inputs: list[Path], names: list[str], outdir: Path, optio
         result, warnings = convert(tool, files, destination / 'convert', basic, settings, report)
         if options.postprocess != 'none':
             finish_options = ConvertOptions(text=options.text, start=options.start,
-                watermark_opacity=options.watermark_opacity, watermark_angle=options.watermark_angle)
+                watermark_opacity=options.watermark_opacity, watermark_angle=options.watermark_angle,
+                compression=options.compression, compression_dpi=options.compression_dpi, compression_quality=options.compression_quality)
             report(None, 'Дополнительная обработка PDF')
             result, more = convert(finishing[options.postprocess], [result], destination / 'finish', finish_options, settings, report)
             warnings.extend(more)
-        return result, warnings
+        details = {}
+        sidecar = result.parent / 'compression.json'
+        if sidecar.is_file():
+            details['compression'] = json.loads(sidecar.read_text())
+        return result, warnings, details
 
     try:
         if not options.batch:
-            result, warnings = one(inputs, work / 'single', progress)
+            result, warnings, details = one(inputs, work / 'single', progress)
             target = outdir / ('result' + result.suffix)
             result.replace(target)
+            if details:
+                (outdir / 'details.json').write_text(json.dumps(details, ensure_ascii=False))
             return target, warnings, None
         report, success, total_size = [], 0, 0
         target = outdir / 'batch.zip'
@@ -67,14 +74,14 @@ def execute(tool: str, inputs: list[Path], names: list[str], outdir: Path, optio
                     value = None if percent is None else round(95 * (i + percent / 100) / len(inputs))
                     progress(value, f'Файл {i + 1} из {len(inputs)} · {stage}')
                 try:
-                    result, warnings = one([path], destination, status)
+                    result, warnings, details = one([path], destination, status)
                     next_size = total_size + result.stat().st_size
                     if next_size > settings.max_output_mb * 1024 * 1024:
                         raise ConversionError('Суммарный результат превышает лимит. Уменьшите число файлов.')
                     entry = f'{i + 1:02d}-{result_stem(names[i])}{result.suffix}'
                     archive.write(result, arcname=entry)
                     total_size = next_size
-                    report.append({'source': names[i], 'status': 'done', 'result': entry, 'warnings': warnings})
+                    report.append({'source': names[i], 'status': 'done', 'result': entry, 'warnings': warnings, 'details': details})
                     success += 1
                 except ConversionError as exc:
                     report.append({'source': names[i], 'status': 'error', 'error': str(exc)})

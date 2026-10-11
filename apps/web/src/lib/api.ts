@@ -71,7 +71,7 @@ export const login = (password: string) => request<{ authenticated: boolean }>('
 });
 export const logout = () => request('/api/v1/access/logout', { method: 'POST' });
 export async function resultFile(job: Job, signal: AbortSignal): Promise<File> {
-  const response = await fetch(`/api/v1/jobs/${encodeURIComponent(job.id)}/download`, { credentials: 'same-origin', signal });
+  const response = await fetch(`/api/v1/jobs/${encodeURIComponent(job.id)}/download`, { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]) });
   if (!response.ok) throw new ApiError('Результат недоступен. Возможно, срок хранения истёк.', response.status);
   const blob = await response.blob();
   const name = (job.names[0] || 'result').replace(/\.[^.]+$/, '') + '-result' + (job.outputExtension || '');

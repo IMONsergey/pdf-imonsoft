@@ -37,7 +37,9 @@ def main() -> int:
         size = result.stat().st_size
         if not 0 < size <= settings.max_output_mb * 1024 * 1024:
             raise ConversionError('Результат пуст или превышает допустимый размер.')
-        atomic_json(root / 'result.json', {'file': result.name, 'size': size, 'warnings': warnings, 'batch': batch})
+        details_path = root / 'output' / 'details.json'
+        details = json.loads(details_path.read_text()) if details_path.is_file() else {}
+        atomic_json(root / 'result.json', {'file': result.name, 'size': size, 'warnings': warnings, 'batch': batch, 'details': details})
         return 0
     except ConversionError as exc:
         atomic_json(root / 'error.json', {'message': str(exc)})

@@ -1,13 +1,15 @@
 import type { Options, Tool } from '../lib/types';
 import { useApp } from '../lib/context';
 import { Icon } from './Icon';
+import { CompressionOptions } from './CompressionOptions';
 
-export const defaultOptions: Options = { pages: '', angle: 90, dpi: 144, password: '', new_password: '', text: '', start: 1, format: 'webp', quality: 85, width: 1920, height: 1080, page_size: 'original', language: 'eng+rus', page_plan: [], batch: false, postprocess: 'none', split_every: 1, crop_top: 5, crop_right: 5, crop_bottom: 5, crop_left: 5, watermark_opacity: 0.22, watermark_angle: 30, flip: 'horizontal' };
+export const defaultOptions: Options = { pages: '', angle: 90, dpi: 144, password: '', new_password: '', text: '', start: 1, format: 'webp', quality: 85, width: 1920, height: 1080, page_size: 'original', language: 'eng+rus', page_plan: [], batch: false, postprocess: 'none', split_every: 1, crop_top: 5, crop_right: 5, crop_bottom: 5, crop_left: 5, watermark_opacity: 0.22, watermark_angle: 30, flip: 'horizontal', compression: 'balanced', compression_dpi: 160, compression_quality: 82 };
 export function SettingsFields({ tool, options, setOptions }: { tool: Tool; options: Options; setOptions: (value: Options) => void }) {
   const { config } = useApp();
   const set = (key: string, value: string | number) => setOptions({ ...options, [key]: value });
   const number = (key: string, label: string, min: number, max: number) => <label className="field" key={key}><span>{label}</span><input type="number" min={min} max={max} step={1} required value={String(options[key])} onChange={event => set(key, event.target.value === '' ? '' : Number(event.target.value))} /></label>;
-  return <div className="settings-fields">{tool.settings.filter(key => key !== 'password' && key !== 'page_plan').map(key => {
+  return <div className="settings-fields">{tool.settings.filter(key => key !== 'password' && key !== 'page_plan' && !['compression_dpi', 'compression_quality'].includes(key)).map(key => {
+    if (key === 'compression') return <CompressionOptions key={key} options={options} setOptions={setOptions} />;
     if (key === 'pages') return <label className="field" key={key}><span>{tool.id === 'remove-pages' ? 'Какие страницы удалить' : 'Страницы'}</span><input value={options.pages} onChange={event => set(key, event.target.value)} placeholder="Например: 1–3, 5" maxLength={8000} required={['extract-pages', 'remove-pages'].includes(tool.id)} /><small>{tool.id === 'extract-pages' ? 'Порядок сохраняется: 3, 1–2 переместит третью страницу в начало.' : tool.id === 'remove-pages' ? 'Остальные страницы останутся на своих местах.' : 'Оставьте пустым, чтобы обработать все страницы.'}</small></label>;
     if (key === 'angle') return <div className="field" key={key}><span id="angle-label">Поворот по часовой стрелке</span><div className="segmented" role="group" aria-labelledby="angle-label">{[90, 180, 270].map(value => <button key={value} type="button" aria-pressed={options.angle === value} className={options.angle === value ? 'selected' : ''} onClick={() => set(key, value)}>{value}°</button>)}</div></div>;
     if (key === 'dpi') return <label className="field" key={key}><span>Качество изображений</span><select value={options.dpi} onChange={event => set(key, Number(event.target.value))}><option value={96}>Стандартное · 96 DPI</option><option value={144}>Высокое · 144 DPI</option><option value={192}>Максимальное · 192 DPI</option></select><small>Выше качество — больше размер результата.</small></label>;
