@@ -1,0 +1,506 @@
+[
+  {
+    "id": "pptx-to-pdf",
+    "title": "PowerPoint → PDF",
+    "description": "Превратите презентацию в документ, который удобно отправить.",
+    "category": "presentations",
+    "engine": "office",
+    "accept": [
+      ".ppt",
+      ".pptx",
+      ".odp"
+    ],
+    "output": "PDF",
+    "icon": "presentation",
+    "settings": [],
+    "notice": "Шрифты и сложные эффекты могут отличаться от PowerPoint. Анимация и видео не переносятся в PDF.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": true,
+    "keywords": "ппт пптх презентация слайды powerpoint"
+  },
+  {
+    "id": "pdf-to-pptx",
+    "title": "PDF → PowerPoint",
+    "description": "Каждая страница — отдельный слайд с исходным оформлением.",
+    "category": "presentations",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PPTX",
+    "icon": "slides",
+    "settings": [
+      "dpi",
+      "password"
+    ],
+    "notice": "Внешний вид сохраняется как изображение. Текст и объекты не редактируются отдельно. Страницы разного размера вписываются в размер первого слайда.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": true,
+    "keywords": "ппт пптх презентация слайды powerpoint"
+  },
+  {
+    "id": "merge-pdf",
+    "title": "Объединить PDF",
+    "description": "Соберите несколько документов в один — в нужном порядке.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "combine",
+    "settings": [
+      "password"
+    ],
+    "notice": "",
+    "multiple": true,
+    "minFiles": 2,
+    "featured": true,
+    "keywords": "склеить соединить merge"
+  },
+  {
+    "id": "split-pdf",
+    "title": "Разделить PDF",
+    "description": "Получите отдельный PDF для каждой страницы в ZIP-архиве.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "ZIP",
+    "icon": "split",
+    "settings": [
+      "password"
+    ],
+    "notice": "",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "extract-pages",
+    "title": "Извлечь страницы",
+    "description": "Оставьте выбранные страницы и задайте их последовательность.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "pages",
+    "settings": [
+      "pages",
+      "password"
+    ],
+    "notice": "",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "выбрать переставить сортировка порядок"
+  },
+  {
+    "id": "remove-pages",
+    "title": "Удалить страницы",
+    "description": "Уберите ненужные страницы из документа.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "remove",
+    "settings": [
+      "pages",
+      "password"
+    ],
+    "notice": "",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "rotate-pdf",
+    "title": "Повернуть страницы",
+    "description": "Измените ориентацию всех или выбранных страниц.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "rotate",
+    "settings": [
+      "angle",
+      "pages",
+      "password"
+    ],
+    "notice": "",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "compress-pdf",
+    "title": "Оптимизировать PDF",
+    "description": "Уплотните структуру и потоки без растрирования страниц.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "compress",
+    "settings": [
+      "password"
+    ],
+    "notice": "Оптимизация без потери качества. Уже сжатый файл может почти не уменьшиться — тогда вернём оригинал.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "сжать уменьшить размер"
+  },
+  {
+    "id": "protect-pdf",
+    "title": "Защитить паролем",
+    "description": "Добавьте пароль для открытия документа. Шифрование AES-256.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "lock",
+    "settings": [
+      "new_password",
+      "password"
+    ],
+    "notice": "",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "unlock-pdf",
+    "title": "Снять пароль",
+    "description": "Сохраните доступный вам документ без пароля.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "unlock",
+    "settings": [
+      "password"
+    ],
+    "notice": "Нужен действующий пароль. Подбор и обход неизвестного пароля не выполняются.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "watermark-pdf",
+    "title": "Водяной знак",
+    "description": "Добавьте текстовую отметку на все страницы.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "watermark",
+    "settings": [
+      "text",
+      "password"
+    ],
+    "notice": "Это визуальная отметка, а не защита от копирования и не электронная подпись.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "number-pages",
+    "title": "Номера страниц",
+    "description": "Добавьте последовательную нумерацию внизу документа.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "numbers",
+    "settings": [
+      "start",
+      "password"
+    ],
+    "notice": "",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "pdf-to-jpg",
+    "title": "PDF → JPG",
+    "description": "Экспортируйте страницы в изображения для публикации.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "ZIP / JPG",
+    "icon": "image",
+    "settings": [
+      "dpi",
+      "pages",
+      "password"
+    ],
+    "notice": "",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "pdf-to-png",
+    "title": "PDF → PNG",
+    "description": "Сохраните страницы в PNG без потерь сжатия.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "ZIP / PNG",
+    "icon": "image",
+    "settings": [
+      "dpi",
+      "pages",
+      "password"
+    ],
+    "notice": "",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "images-to-pdf",
+    "title": "Изображения → PDF",
+    "description": "Соберите фотографии и графику в один документ.",
+    "category": "images",
+    "engine": "image",
+    "accept": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".tif",
+      ".tiff",
+      ".bmp"
+    ],
+    "output": "PDF",
+    "icon": "file-image",
+    "settings": [
+      "page_size"
+    ],
+    "notice": "",
+    "multiple": true,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "jpg jpeg png webp фото"
+  },
+  {
+    "id": "pdf-to-text",
+    "title": "Извлечь текст",
+    "description": "Сохраните текстовый слой PDF в UTF-8.",
+    "category": "documents",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "TXT",
+    "icon": "text",
+    "settings": [
+      "pages",
+      "password"
+    ],
+    "notice": "Только существующий текстовый слой. Для сканов используйте распознавание текста.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "txt текст копировать"
+  },
+  {
+    "id": "docx-to-pdf",
+    "title": "Word → PDF",
+    "description": "Подготовьте документ Word или OpenDocument к отправке.",
+    "category": "documents",
+    "engine": "office",
+    "accept": [
+      ".doc",
+      ".docx",
+      ".odt",
+      ".rtf"
+    ],
+    "output": "PDF",
+    "icon": "text",
+    "settings": [],
+    "notice": "Верстка зависит от доступных на сервере шрифтов.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "doc docx ворд документ"
+  },
+  {
+    "id": "excel-to-pdf",
+    "title": "Excel → PDF",
+    "description": "Экспортируйте таблицу с её параметрами печати.",
+    "category": "documents",
+    "engine": "office",
+    "accept": [
+      ".xls",
+      ".xlsx",
+      ".ods"
+    ],
+    "output": "PDF",
+    "icon": "table",
+    "settings": [],
+    "notice": "Используются области печати и разбиение на страницы исходного файла. Это не автоматическая верстка таблицы.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "xls xlsx эксель таблица"
+  },
+  {
+    "id": "image-convert",
+    "title": "Конвертировать изображение",
+    "description": "Переведите изображение в JPG, PNG или WebP.",
+    "category": "images",
+    "engine": "image",
+    "accept": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".tif",
+      ".tiff",
+      ".bmp"
+    ],
+    "output": "JPG / PNG / WebP",
+    "icon": "image",
+    "settings": [
+      "format",
+      "quality"
+    ],
+    "notice": "Прозрачность при экспорте в JPG заменяется белым фоном. Для многостраничного TIFF берётся первый кадр.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "image-resize",
+    "title": "Размер изображения",
+    "description": "Впишите изображение в заданные размеры без искажения.",
+    "category": "images",
+    "engine": "image",
+    "accept": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".tif",
+      ".tiff",
+      ".bmp"
+    ],
+    "output": "JPG / PNG / WebP",
+    "icon": "resize",
+    "settings": [
+      "width",
+      "height",
+      "format",
+      "quality"
+    ],
+    "notice": "Пропорции сохраняются. Маленькие изображения не увеличиваются; метаданные не переносятся.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "image-compress",
+    "title": "Сжать изображение",
+    "description": "Сохраните компактную копию в JPG или WebP.",
+    "category": "images",
+    "engine": "image",
+    "accept": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".tif",
+      ".tiff",
+      ".bmp"
+    ],
+    "output": "JPG / WebP",
+    "icon": "compress",
+    "settings": [
+      "format",
+      "quality"
+    ],
+    "notice": "JPG и WebP используют сжатие с потерями. PNG сжимается без потерь; меньший размер не гарантируется.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "pdf-metadata",
+    "title": "Удалить метаданные PDF",
+    "description": "Уберите стандартные сведения об авторе и XMP-метаданные.",
+    "category": "pdf",
+    "engine": "pdf",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "clean",
+    "settings": [
+      "password"
+    ],
+    "notice": "Это не обезличивание документа: текст страниц, вложения и другие скрытые данные не очищаются автоматически.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": ""
+  },
+  {
+    "id": "ocr-pdf",
+    "title": "Распознать скан",
+    "description": "Создайте PDF с доступным для поиска текстом.",
+    "category": "documents",
+    "engine": "ocr",
+    "accept": [
+      ".pdf"
+    ],
+    "output": "PDF",
+    "icon": "scan",
+    "settings": [
+      "language",
+      "password"
+    ],
+    "notice": "Страницы растрируются с 144 DPI. Распознавание может ошибаться; проверяйте важные числа и имена. Исходные векторные элементы и подписи не сохраняются.",
+    "multiple": false,
+    "minFiles": 1,
+    "featured": false,
+    "keywords": "ocr распознать русский английский скан"
+  }
+]
