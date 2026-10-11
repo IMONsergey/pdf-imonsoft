@@ -1,0 +1,96 @@
+name: imonsoft-files
+services:
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:8080"
+    environment:
+      MAX_REQUEST_MB: ${MAX_REQUEST_MB:-52}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [edge, processing]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m,uid=101,gid=101
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 192m
+    pids_limit: 64
+    restart: unless-stopped
+  api:
+    build:
+      context: .
+      dockerfile: deploy/api.Dockerfile
+    environment:
+      DATA_DIR: /data
+      TOOLS_FILE: /app/shared/tools.json
+      GOTENBERG_URL: http://gotenberg:3000
+      OFFICE_ENGINE: gotenberg
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      MAX_PAGES: ${MAX_PAGES:-200}
+      MAX_FILES: ${MAX_FILES:-20}
+      MAX_OUTPUT_MB: ${MAX_OUTPUT_MB:-250}
+      MAX_STORAGE_MB: ${MAX_STORAGE_MB:-4096}
+      SESSION_STORAGE_MB: ${SESSION_STORAGE_MB:-1024}
+      ACCESS_PASSWORD_HASH: ${ACCESS_PASSWORD_HASH:-}
+      RETENTION_SECONDS: ${RETENTION_SECONDS:-3600}
+      JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-180}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      WORKER_MEMORY_MB: ${WORKER_MEMORY_MB:-1024}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      HOME: /tmp
+    volumes: [files-data:/data]
+    depends_on:
+      gotenberg:
+        condition: service_started
+    networks: [processing]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,uid=10001,gid=10001
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 128
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+  gotenberg:
+    image: gotenberg/gotenberg:8.37.0
+    command:
+      - gotenberg
+      - --api-timeout=180s
+      - --api-body-limit=52MB
+      - --api-disable-download-from=true
+      - --chromium-disable-routes=true
+      - --libreoffice-auto-start=true
+      - --libreoffice-max-queue-size=4
+      - --libreoffice-deny-list=.*
+      - --libreoffice-deny-private-ips=true
+      - --libreoffice-deny-public-ips=true
+      - --webhook-disable=true
+    networks: [processing]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=512m,uid=1001,gid=1001
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 256
+    restart: unless-stopped
+networks:
+  edge: {}
+  processing:
+    internal: true
+volumes:
+  files-data: {}

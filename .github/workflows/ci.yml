@@ -1,0 +1,50 @@
+name: Platform checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install conversion engines and packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-impress libreoffice-writer libreoffice-calc tesseract-ocr tesseract-ocr-eng fonts-dejavu-core
+          pip install --require-hashes -r services/api/requirements-dev.lock
+      - name: Backend tests (including real Office and OCR)
+        working-directory: services/api
+        run: python -m pytest tests -q
+      - name: Build frontend
+        working-directory: apps/web
+        run: npm ci && npm run build
+      - name: Browser setup and synthetic fixtures
+        run: |
+          python scripts/make-fixtures.py
+          cd apps/web && npx playwright install --with-deps chromium
+      - name: Browser tests against real API
+        run: |
+          cd services/api
+          OFFICE_ENGINE=local DATA_DIR="$RUNNER_TEMP/imonsoft-e2e" uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log > "$RUNNER_TEMP/imonsoft-api.log" 2>&1 &
+          cd ../../apps/web
+          npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7

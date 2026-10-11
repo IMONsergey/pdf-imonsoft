@@ -1,0 +1,13 @@
+fastapi==0.143.0
+starlette==1.7.0
+uvicorn==0.48.0
+python-multipart==0.0.32
+pypdf[crypto]==6.19.0
+pypdfium2==5.8.0
+python-pptx==1.0.2
+Pillow==12.3.0
+reportlab==4.4.9
+httpx==0.28.1
+itsdangerous==2.2.0
+python-docx==1.2.0
+pikepdf==10.12.0
